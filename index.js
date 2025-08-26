@@ -868,6 +868,8 @@ app.get('/youtube-uploads', async (req, res) => {
 
 app.post("/competitions-upload", auth, async (req, res) => {
   try {
+    // console.log("📥 Incoming request body:", req.body);
+
     const {
       name,
       phone,
@@ -878,20 +880,26 @@ app.post("/competitions-upload", auth, async (req, res) => {
       description,
     } = req.body;
 
-    const authorId = req.user; // assuming this is user._id from auth middleware
+    // console.log("🧑 Auth user from middleware:", req.user);
+
+    const authorId = req.user?._id; // safe optional chaining
+    // console.log("✅ Extracted authorId:", authorId);
 
     // 🔍 Check if user already submitted
-    const existingSubmission = await CompetitionSubmission.findOne({
+    const existingSubmission = await Competition.findOne({
       author: authorId,
       isSubmitted: true
     });
 
+    // console.log("🔍 Existing submission found:", existingSubmission);
+
     if (existingSubmission) {
+      console.warn("⚠️ User already submitted!");
       return res.status(400).json({ error: "మీరు ఇప్పటికే సమర్పించారు." });
     }
 
     // ✅ Create and mark as submitted
-    const newSubmission = new CompetitionSubmission({
+    const newSubmission = new Competition({
       name,
       phone,
       college,
@@ -899,11 +907,14 @@ app.post("/competitions-upload", auth, async (req, res) => {
       roll,
       content,
       description,
-      author: authorId,        // ✅ Save author ID
+      author: authorId,
       isSubmitted: true
     });
 
+    // console.log("📝 New submission object created:", newSubmission);
+
     await newSubmission.save();
+    // console.log("✅ Submission saved to DB successfully");
 
     res.status(201).json({
       message: "Submitted successfully!",
@@ -911,10 +922,14 @@ app.post("/competitions-upload", auth, async (req, res) => {
     });
 
   } catch (err) {
+    console.error("❌ Competition Upload Error:", err);
+
     if (err.code === 11000) {
+      console.warn("⚠️ Duplicate roll number submission detected");
       return res.status(400).json({ error: "ఈ రోల్ నంబర్ నుండి ఇప్పటికే సమర్పించబడింది." });
     }
-    res.status(500).json({ error: "Server error." });
+
+    res.status(500).json({ error: "Server error.", details: err.message });
   }
 });
 
